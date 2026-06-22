@@ -1,0 +1,165 @@
+:root {
+  color: #f7fafc;
+  background: #090b0e;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --surface: rgb(18 22 27 / 76%);
+  --surface-border: rgb(255 255 255 / 16%);
+  --text-muted: #aab3bf;
+  --accent: #39cef5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  background: #090b0e;
+}
+
+.status-pill {
+  position: fixed;
+  top: 28px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 20px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: #eaf7fb;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  transform: translateX(-50%);
+  backdrop-filter: blur(18px);
+}
+
+.status-pill__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 18px rgb(57 206 245 / 80%);
+}
+
+.welcome-panel {
+  width: min(620px, calc(100% - 40px));
+  text-align: center;
+}
+
+.welcome-panel__eyebrow {
+  margin: 0 0 16px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+.welcome-panel h1 {
+  margin: 0;
+  font-size: clamp(40px, 6vw, 76px);
+  font-weight: 650;
+  letter-spacing: -0.05em;
+}
+
+.welcome-panel p:last-child {
+  max-width: 520px;
+  margin: 24px auto 0;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.stage-dock {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  left: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 72px;
+  padding: 16px 28px;
+  border: 1px solid var(--surface-border);
+  border-radius: 28px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 14px;
+  backdrop-filter: blur(20px);
+}
+
+.stage-dock strong {
+  color: #f8fbfc;
+  font-size: 15px;
+}
+
+.stage-dock__label {
+  color: #75808d;
+}
+
+.stage-dock__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--surface-border);
+}
+
+@media (max-width: 640px) {
+  .status-pill {
+    top: 18px;
+  }
+
+  .stage-dock {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    min-height: 76px;
+    border-radius: 22px;
+  }
+
+  .stage-dock__label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
