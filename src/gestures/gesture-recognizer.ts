@@ -7,15 +7,19 @@ import type {
 
 const pinchEnterRatio = 0.32;
 const pinchExitRatio = 0.44;
+const pinchEnterConfirmFrames = 2;
+const pinchExitConfirmFrames = 3;
 
 export class GestureRecognizer {
   private isPinching = false;
+  private pinchEnterFrames = 0;
+  private pinchExitFrames = 0;
 
   public analyze(observation: HandObservation | null): GestureSnapshot {
     if (!observation) {
-      const pinchEnded = this.isPinching;
-      this.isPinching = false;
-      return emptySnapshot(pinchEnded);
+      this.pinchEnterFrames = 0;
+      this.pinchExitFrames = 0;
+      return emptySnapshot(false);
     }
 
     const landmarks = observation.landmarks;
@@ -24,9 +28,31 @@ export class GestureRecognizer {
     const pinchRatio = palmWidth > 0 ? pinchDistance / palmWidth : 1;
     const wasPinching = this.isPinching;
 
-    this.isPinching = this.isPinching
-      ? pinchRatio < pinchExitRatio
-      : pinchRatio < pinchEnterRatio;
+    if (this.isPinching) {
+      this.pinchEnterFrames = 0;
+
+      if (pinchRatio >= pinchExitRatio) {
+        this.pinchExitFrames += 1;
+        if (this.pinchExitFrames >= pinchExitConfirmFrames) {
+          this.isPinching = false;
+          this.pinchExitFrames = 0;
+        }
+      } else {
+        this.pinchExitFrames = 0;
+      }
+    } else {
+      this.pinchExitFrames = 0;
+
+      if (pinchRatio < pinchEnterRatio) {
+        this.pinchEnterFrames += 1;
+        if (this.pinchEnterFrames >= pinchEnterConfirmFrames) {
+          this.isPinching = true;
+          this.pinchEnterFrames = 0;
+        }
+      } else {
+        this.pinchEnterFrames = 0;
+      }
+    }
 
     const indexExtended = isFingerExtended(landmarks, 5, 6, 8);
     const middleExtended = isFingerExtended(landmarks, 9, 10, 12);
@@ -62,6 +88,8 @@ export class GestureRecognizer {
 
   public reset(): void {
     this.isPinching = false;
+    this.pinchEnterFrames = 0;
+    this.pinchExitFrames = 0;
   }
 }
 
@@ -116,4 +144,3 @@ function midpoint(
 function toPoint(landmark: NormalizedLandmark | undefined): Point2D | null {
   return landmark ? { x: landmark.x, y: landmark.y } : null;
 }
-

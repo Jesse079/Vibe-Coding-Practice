@@ -6,6 +6,10 @@ describe("GestureRecognizer pinch hysteresis", () => {
   it("uses separate enter and exit thresholds", () => {
     const recognizer = new GestureRecognizer();
 
+    const pendingEnter = recognizer.analyze(createObservation(0.05));
+    expect(pendingEnter.pinchStarted).toBe(false);
+    expect(pendingEnter.isPinching).toBe(false);
+
     const entered = recognizer.analyze(createObservation(0.05));
     expect(entered.pinchStarted).toBe(true);
     expect(entered.isPinching).toBe(true);
@@ -14,15 +18,40 @@ describe("GestureRecognizer pinch hysteresis", () => {
     expect(heldInHysteresis.isPinching).toBe(true);
     expect(heldInHysteresis.pinchStarted).toBe(false);
 
+    const pendingExitOne = recognizer.analyze(createObservation(0.1));
+    const pendingExitTwo = recognizer.analyze(createObservation(0.1));
+    expect(pendingExitOne.isPinching).toBe(true);
+    expect(pendingExitTwo.isPinching).toBe(true);
+
     const released = recognizer.analyze(createObservation(0.1));
     expect(released.isPinching).toBe(false);
     expect(released.pinchEnded).toBe(true);
   });
 
-  it("releases safely when the hand disappears", () => {
+  it("does not release on a single missing-hand frame", () => {
     const recognizer = new GestureRecognizer();
     recognizer.analyze(createObservation(0.05));
-    expect(recognizer.analyze(null).pinchEnded).toBe(true);
+    recognizer.analyze(createObservation(0.05));
+
+    const missingFrame = recognizer.analyze(null);
+    expect(missingFrame.pinchEnded).toBe(false);
+
+    const recovered = recognizer.analyze(createObservation(0.05));
+    expect(recovered.isPinching).toBe(true);
+    expect(recovered.pinchEnded).toBe(false);
+  });
+
+  it("ignores one-frame pinch threshold spikes", () => {
+    const recognizer = new GestureRecognizer();
+    recognizer.analyze(createObservation(0.05));
+    expect(recognizer.analyze(createObservation(0.1)).isPinching).toBe(false);
+
+    recognizer.analyze(createObservation(0.05));
+    const entered = recognizer.analyze(createObservation(0.05));
+    expect(entered.isPinching).toBe(true);
+
+    expect(recognizer.analyze(createObservation(0.1)).isPinching).toBe(true);
+    expect(recognizer.analyze(createObservation(0.08)).isPinching).toBe(true);
   });
 
   it("recognizes an open palm and a single index finger", () => {

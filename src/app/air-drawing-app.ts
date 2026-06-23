@@ -42,6 +42,7 @@ const widths = [4, 8, 12, 18, 26] as const;
 const openPalmDurationMs = 600;
 const selectionHoverDurationMs = 800;
 const clearArmDurationMs = 600;
+const drawingLossGraceMs = 120;
 
 export class AirDrawingApp {
   private readonly videoElement: HTMLVideoElement;
@@ -85,6 +86,7 @@ export class AirDrawingApp {
   private isDiagnosticsVisible = true;
   private isClearArmed = false;
   private isTrackingReady = false;
+  private lastDrawingHandSeenAtMs: number | null = null;
 
   public constructor(private readonly rootElement: HTMLElement) {
     this.rootElement.innerHTML = createAppTemplate();
@@ -200,7 +202,7 @@ export class AirDrawingApp {
     const gesture = this.gestureRecognizer.analyze(observation);
     this.lastGesture = gesture;
     const pointer = this.mapPoint(gesture.pointer);
-    const pinchPoint = this.mapPoint(gesture.pinchPoint);
+    const drawingPoint = this.mapPoint(gesture.pointer);
 
     this.handSummary.textContent = observation
       ? `${observation.handedness === "Left" ? "左手" : observation.handedness === "Right" ? "右手" : "手部"} · 已识别`
@@ -208,29 +210,29 @@ export class AirDrawingApp {
 
     this.renderPointer(pointer, gesture);
     this.diagnosticRenderer.render(observation, this.coverTransform, pointer);
-    this.processGesture(gesture, pointer, pinchPoint);
+    this.processGesture(gesture, pointer, drawingPoint);
   };
 
   private processGesture(
     gesture: GestureSnapshot,
     pointer: Point2D | null,
-    pinchPoint: Point2D | null,
+    drawingPoint: Point2D | null,
   ): void {
     const nowMs = performance.now();
 
     if (this.appState.mode === "idle") {
-      this.processIdleGesture(gesture, pointer, pinchPoint, nowMs);
+      this.processIdleGesture(gesture, pointer, drawingPoint, nowMs);
     } else if (this.appState.mode === "configuring") {
       this.processConfigGesture(gesture, pointer, nowMs);
     } else {
-      this.processDrawingGesture(gesture, pinchPoint, nowMs);
+      this.processDrawingGesture(gesture, drawingPoint, nowMs);
     }
   }
 
   private processIdleGesture(
     gesture: GestureSnapshot,
     pointer: Point2D | null,
-    pinchPoint: Point2D | null,
+    drawingPoint: Point2D | null,
     nowMs: number,
   ): void {
     if (
@@ -273,11 +275,12 @@ export class AirDrawingApp {
 
     if (
       gesture.pinchStarted &&
-      pinchPoint &&
+      drawingPoint &&
       !this.appState.requiresPinchRelease
     ) {
       this.dispatch({ type: "PINCH_STARTED" });
-      this.drawingEngine.beginStroke(pinchPoint, this.brush, nowMs);
+      this.lastDrawingHandSeenAtMs = nowMs;
+      this.drawingEngine.beginStroke(drawingPoint, this.brush, nowMs);
     }
   }
 
@@ -315,15 +318,25 @@ export class AirDrawingApp {
 
   private processDrawingGesture(
     gesture: GestureSnapshot,
-    pinchPoint: Point2D | null,
+    drawingPoint: Point2D | null,
     nowMs: number,
   ): void {
-    if (gesture.isPinching && pinchPoint) {
-      this.drawingEngine.appendPoint(pinchPoint, nowMs);
+    if (gesture.hasHand) {
+      this.lastDrawingHandSeenAtMs = nowMs;
     }
 
-    if (gesture.pinchEnded || !gesture.hasHand) {
+    if (gesture.isPinching && drawingPoint) {
+      this.drawingEngine.appendPoint(drawingPoint, nowMs);
+    }
+
+    const handLossExceededGrace =
+      !gesture.hasHand &&
+      this.lastDrawingHandSeenAtMs !== null &&
+      nowMs - this.lastDrawingHandSeenAtMs > drawingLossGraceMs;
+
+    if (gesture.pinchEnded || handLossExceededGrace) {
       this.drawingEngine.endStroke();
+      this.lastDrawingHandSeenAtMs = null;
       this.dispatch({ type: "PINCH_ENDED" });
     }
   }
@@ -555,6 +568,7 @@ export class AirDrawingApp {
 
   private cancelCurrentInteraction(): void {
     this.drawingEngine.endStroke();
+    this.lastDrawingHandSeenAtMs = null;
     this.appState = transitionAppState(this.appState, { type: "CANCEL" });
     this.openPalmTimer.reset();
     this.selectionHover.reset();
