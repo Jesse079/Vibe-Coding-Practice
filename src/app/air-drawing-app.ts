@@ -60,6 +60,7 @@ export class AirDrawingApp {
   private readonly configPanel: HTMLElement;
   private readonly clearButton: HTMLButtonElement;
   private readonly diagnosticButton: HTMLButtonElement;
+  private readonly exitButton: HTMLButtonElement;
   private readonly openConfigButton: HTMLButtonElement;
   private readonly gesturePointer: HTMLElement;
   private readonly openPalmProgress: HTMLElement;
@@ -103,6 +104,7 @@ export class AirDrawingApp {
     this.configPanel = getRequiredElement("[data-config-panel]");
     this.clearButton = getRequiredElement("[data-clear-action]");
     this.diagnosticButton = getRequiredElement("[data-diagnostic-action]");
+    this.exitButton = getRequiredElement("[data-exit-action]");
     this.openConfigButton = getRequiredElement("[data-open-config]");
     this.gesturePointer = getRequiredElement("[data-gesture-pointer]");
     this.openPalmProgress = getRequiredElement("[data-open-palm-progress]");
@@ -143,6 +145,7 @@ export class AirDrawingApp {
     });
     this.clearButton.addEventListener("click", this.clearCanvas);
     this.diagnosticButton.addEventListener("click", this.toggleDiagnostics);
+    this.exitButton.addEventListener("click", this.exitDrawingSession);
     this.openConfigButton.addEventListener("click", () => {
       if (this.appState.mode === "idle") {
         this.dispatch({ type: "OPEN_PALM_READY" });
@@ -159,6 +162,7 @@ export class AirDrawingApp {
 
     const isActive = state.status === "active";
     this.cameraPanel.hidden = isActive;
+    this.exitButton.hidden = !isActive;
     this.videoElement.classList.toggle("camera-feed--active", isActive);
 
     if (isActive) {
@@ -528,6 +532,18 @@ export class AirDrawingApp {
       : "显示关键点";
   };
 
+  private readonly exitDrawingSession = (): void => {
+    this.drawingEngine.clear();
+    this.diagnosticRenderer.clear();
+    this.gesturePointer.hidden = true;
+    this.openPalmProgress.hidden = true;
+    this.lastObservation = null;
+    this.lastGesture = null;
+    this.isClearArmed = false;
+    this.handTracker.stop();
+    this.cameraController.stop();
+  };
+
   private readonly handleVisibilityChange = (): void => {
     if (document.hidden) {
       this.cancelCurrentInteraction();
@@ -608,6 +624,7 @@ function createAppTemplate(): string {
           <small>识别性能</small><strong data-performance-summary>等待识别</strong>
         </div>
         <span class="stage-dock__spacer"></span>
+        <button class="dock-action" type="button" data-exit-action hidden>退出</button>
         <button class="dock-action" type="button" data-diagnostic-action aria-pressed="true">隐藏关键点</button>
         <button class="dock-action dock-action--danger gesture-target" type="button" data-clear-action data-gesture-target="clear">清除</button>
       </footer>
