@@ -274,7 +274,7 @@ export class AirDrawingApp {
     }
 
     if (
-      gesture.pinchStarted &&
+      gesture.drawingPinchStarted &&
       drawingPoint &&
       !this.appState.requiresPinchRelease
     ) {
@@ -325,7 +325,7 @@ export class AirDrawingApp {
       this.lastDrawingHandSeenAtMs = nowMs;
     }
 
-    if (gesture.isPinching && drawingPoint) {
+    if (gesture.isDrawingPinching && drawingPoint) {
       this.drawingEngine.appendPoint(drawingPoint, nowMs);
     }
 
@@ -334,7 +334,7 @@ export class AirDrawingApp {
       this.lastDrawingHandSeenAtMs !== null &&
       nowMs - this.lastDrawingHandSeenAtMs > drawingLossGraceMs;
 
-    if (gesture.pinchEnded || handLossExceededGrace) {
+    if (gesture.drawingPinchEnded || handLossExceededGrace) {
       this.drawingEngine.endStroke();
       this.lastDrawingHandSeenAtMs = null;
       this.dispatch({ type: "PINCH_ENDED" });
@@ -447,7 +447,10 @@ export class AirDrawingApp {
 
     this.gesturePointer.hidden = false;
     this.gesturePointer.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`;
-    this.gesturePointer.classList.toggle("is-pinching", gesture.isPinching);
+    this.gesturePointer.classList.toggle(
+      "is-pinching",
+      gesture.isPinching || gesture.isDrawingPinching,
+    );
   }
 
   private renderOpenPalmProgress(progress: number): void {

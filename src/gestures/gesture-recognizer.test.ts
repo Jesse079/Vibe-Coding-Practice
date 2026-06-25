@@ -54,6 +54,26 @@ describe("GestureRecognizer pinch hysteresis", () => {
     expect(recognizer.analyze(createObservation(0.08)).isPinching).toBe(true);
   });
 
+  it("uses thumb and middle finger pinch as the drawing trigger", () => {
+    const recognizer = new GestureRecognizer();
+
+    const pendingEnter = recognizer.analyze(createDrawingObservation(0.05));
+    expect(pendingEnter.drawingPinchStarted).toBe(false);
+    expect(pendingEnter.isDrawingPinching).toBe(false);
+    expect(pendingEnter.isPinching).toBe(false);
+
+    const entered = recognizer.analyze(createDrawingObservation(0.05));
+    expect(entered.drawingPinchStarted).toBe(true);
+    expect(entered.isDrawingPinching).toBe(true);
+    expect(entered.pinchStarted).toBe(false);
+
+    recognizer.analyze(createDrawingObservation(0.1));
+    recognizer.analyze(createDrawingObservation(0.1));
+    const released = recognizer.analyze(createDrawingObservation(0.1));
+    expect(released.drawingPinchEnded).toBe(true);
+    expect(released.isDrawingPinching).toBe(false);
+  });
+
   it("recognizes an open palm and a single index finger", () => {
     const recognizer = new GestureRecognizer();
     expect(recognizer.analyze(createOpenPalm()).isOpenPalm).toBe(true);
@@ -77,6 +97,14 @@ function createObservation(tipDistance: number): HandObservation {
     confidence: 1,
     timestampMs: 0,
   };
+}
+
+function createDrawingObservation(tipDistance: number): HandObservation {
+  const landmarks = createObservation(0.2).landmarks;
+  landmarks[4] = { x: 0.5 - tipDistance / 2, y: 0.4, z: 0 };
+  landmarks[12] = { x: 0.5 + tipDistance / 2, y: 0.4, z: 0 };
+  landmarks[8] = { x: 0.76, y: 0.18, z: 0 };
+  return toObservation(landmarks);
 }
 
 function createOpenPalm(): HandObservation {

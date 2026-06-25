@@ -4,6 +4,7 @@ export class DrawingEngine {
   private strokes: Stroke[] = [];
   private activeStroke: Stroke | null = null;
   private filteredPoint: Point2D | null = null;
+  private filteredPointTimestampMs: number | null = null;
 
   public constructor(private readonly canvas: HTMLCanvasElement) {}
 
@@ -18,6 +19,7 @@ export class DrawingEngine {
     };
     this.activeStroke = stroke;
     this.filteredPoint = point;
+    this.filteredPointTimestampMs = timestampMs;
     this.strokes.push(stroke);
     this.render();
   }
@@ -25,7 +27,7 @@ export class DrawingEngine {
   public appendPoint(point: Point2D, timestampMs: number): void {
     if (!this.activeStroke) return;
 
-    const smoothedPoint = this.smooth(point);
+    const smoothedPoint = this.smooth(point, timestampMs);
     const previous = this.activeStroke.points.at(-1);
     const normalizedPoint = this.toNormalizedPoint(smoothedPoint, timestampMs);
 
@@ -46,6 +48,7 @@ export class DrawingEngine {
   public endStroke(): void {
     this.activeStroke = null;
     this.filteredPoint = null;
+    this.filteredPointTimestampMs = null;
   }
 
   public clear(): void {
@@ -135,22 +138,47 @@ export class DrawingEngine {
     context.stroke();
   }
 
-  private smooth(point: Point2D): Point2D {
+  private smooth(point: Point2D, timestampMs: number): Point2D {
     if (!this.filteredPoint) {
       this.filteredPoint = point;
+      this.filteredPointTimestampMs = timestampMs;
       return point;
     }
 
+    const safePoint = this.limitJump(point, timestampMs);
+    const distance = Math.hypot(
+      safePoint.x - this.filteredPoint.x,
+      safePoint.y - this.filteredPoint.y,
+    );
+    const alpha = Math.min(0.78, Math.max(0.28, distance / 90));
+    this.filteredPoint = {
+      x: this.filteredPoint.x + (safePoint.x - this.filteredPoint.x) * alpha,
+      y: this.filteredPoint.y + (safePoint.y - this.filteredPoint.y) * alpha,
+    };
+    this.filteredPointTimestampMs = timestampMs;
+    return this.filteredPoint;
+  }
+
+  private limitJump(point: Point2D, timestampMs: number): Point2D {
+    if (!this.filteredPoint) return point;
+
+    const elapsedMs =
+      this.filteredPointTimestampMs === null
+        ? 16
+        : Math.max(16, timestampMs - this.filteredPointTimestampMs);
+    const maxStep = Math.max(60, elapsedMs * 2.4);
     const distance = Math.hypot(
       point.x - this.filteredPoint.x,
       point.y - this.filteredPoint.y,
     );
-    const alpha = Math.min(0.72, Math.max(0.34, distance / 80));
-    this.filteredPoint = {
-      x: this.filteredPoint.x + (point.x - this.filteredPoint.x) * alpha,
-      y: this.filteredPoint.y + (point.y - this.filteredPoint.y) * alpha,
+
+    if (distance <= maxStep) return point;
+
+    const scale = maxStep / distance;
+    return {
+      x: this.filteredPoint.x + (point.x - this.filteredPoint.x) * scale,
+      y: this.filteredPoint.y + (point.y - this.filteredPoint.y) * scale,
     };
-    return this.filteredPoint;
   }
 
   private toNormalizedPoint(point: Point2D, timestampMs: number): Point {
@@ -164,4 +192,3 @@ export class DrawingEngine {
     };
   }
 }
-

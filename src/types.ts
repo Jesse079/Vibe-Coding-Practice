@@ -23,9 +23,13 @@ export interface GestureSnapshot {
   isPinching: boolean;
   pinchStarted: boolean;
   pinchEnded: boolean;
+  isDrawingPinching: boolean;
+  drawingPinchStarted: boolean;
+  drawingPinchEnded: boolean;
   pointer: Point2D | null;
   pinchPoint: Point2D | null;
   pinchRatio: number | null;
+  drawingPinchRatio: number | null;
 }
 
 export interface BrushConfig {

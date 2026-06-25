@@ -37,5 +37,20 @@ describe("DrawingEngine", () => {
     engine.clear();
     expect(engine.getStrokeCount()).toBe(0);
   });
-});
 
+  it("limits sudden one-frame jumps while drawing", () => {
+    vi.stubGlobal("window", { devicePixelRatio: 1 });
+    const canvas = {
+      width: 1000,
+      height: 500,
+      getContext: () => null,
+    } as unknown as HTMLCanvasElement;
+    const engine = new DrawingEngine(canvas);
+
+    engine.beginStroke({ x: 0, y: 0 }, { color: "#fff", width: 4 }, 0);
+    engine.appendPoint({ x: 1000, y: 0 }, 16);
+
+    const [, secondPoint] = engine.getStrokes()[0]?.points ?? [];
+    expect(secondPoint?.x).toBeLessThan(0.2);
+  });
+});

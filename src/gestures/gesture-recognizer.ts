@@ -11,48 +11,26 @@ const pinchEnterConfirmFrames = 2;
 const pinchExitConfirmFrames = 3;
 
 export class GestureRecognizer {
-  private isPinching = false;
-  private pinchEnterFrames = 0;
-  private pinchExitFrames = 0;
+  private readonly selectionPinch = new PinchTracker();
+  private readonly drawingPinch = new PinchTracker();
 
   public analyze(observation: HandObservation | null): GestureSnapshot {
     if (!observation) {
-      this.pinchEnterFrames = 0;
-      this.pinchExitFrames = 0;
-      return emptySnapshot(false);
+      this.selectionPinch.handleMissingObservation();
+      this.drawingPinch.handleMissingObservation();
+      return emptySnapshot(false, false);
     }
 
     const landmarks = observation.landmarks;
     const palmWidth = distance(landmarks[5], landmarks[17]);
-    const pinchDistance = distance(landmarks[4], landmarks[8]);
-    const pinchRatio = palmWidth > 0 ? pinchDistance / palmWidth : 1;
-    const wasPinching = this.isPinching;
-
-    if (this.isPinching) {
-      this.pinchEnterFrames = 0;
-
-      if (pinchRatio >= pinchExitRatio) {
-        this.pinchExitFrames += 1;
-        if (this.pinchExitFrames >= pinchExitConfirmFrames) {
-          this.isPinching = false;
-          this.pinchExitFrames = 0;
-        }
-      } else {
-        this.pinchExitFrames = 0;
-      }
-    } else {
-      this.pinchExitFrames = 0;
-
-      if (pinchRatio < pinchEnterRatio) {
-        this.pinchEnterFrames += 1;
-        if (this.pinchEnterFrames >= pinchEnterConfirmFrames) {
-          this.isPinching = true;
-          this.pinchEnterFrames = 0;
-        }
-      } else {
-        this.pinchEnterFrames = 0;
-      }
-    }
+    const pinchRatio = getRelativeDistance(landmarks[4], landmarks[8], palmWidth);
+    const drawingPinchRatio = getRelativeDistance(
+      landmarks[4],
+      landmarks[12],
+      palmWidth,
+    );
+    const selectionPinch = this.selectionPinch.update(pinchRatio);
+    const drawingPinch = this.drawingPinch.update(drawingPinchRatio);
 
     const indexExtended = isFingerExtended(landmarks, 5, 6, 8);
     const middleExtended = isFingerExtended(landmarks, 9, 10, 12);
@@ -70,30 +48,38 @@ export class GestureRecognizer {
         middleExtended &&
         ringExtended &&
         pinkyExtended &&
-        !this.isPinching,
+        !selectionPinch.isPinching &&
+        !drawingPinch.isPinching,
       isIndexPointing:
         indexExtended &&
         !middleExtended &&
         !ringExtended &&
         !pinkyExtended &&
-        !this.isPinching,
-      isPinching: this.isPinching,
-      pinchStarted: !wasPinching && this.isPinching,
-      pinchEnded: wasPinching && !this.isPinching,
+        !selectionPinch.isPinching &&
+        !drawingPinch.isPinching,
+      isPinching: selectionPinch.isPinching,
+      pinchStarted: selectionPinch.started,
+      pinchEnded: selectionPinch.ended,
+      isDrawingPinching: drawingPinch.isPinching,
+      drawingPinchStarted: drawingPinch.started,
+      drawingPinchEnded: drawingPinch.ended,
       pointer: toPoint(landmarks[8]),
       pinchPoint: midpoint(landmarks[4], landmarks[8]),
       pinchRatio,
+      drawingPinchRatio,
     };
   }
 
   public reset(): void {
-    this.isPinching = false;
-    this.pinchEnterFrames = 0;
-    this.pinchExitFrames = 0;
+    this.selectionPinch.reset();
+    this.drawingPinch.reset();
   }
 }
 
-function emptySnapshot(pinchEnded: boolean): GestureSnapshot {
+function emptySnapshot(
+  pinchEnded: boolean,
+  drawingPinchEnded: boolean,
+): GestureSnapshot {
   return {
     hasHand: false,
     isOpenPalm: false,
@@ -101,10 +87,71 @@ function emptySnapshot(pinchEnded: boolean): GestureSnapshot {
     isPinching: false,
     pinchStarted: false,
     pinchEnded,
+    isDrawingPinching: false,
+    drawingPinchStarted: false,
+    drawingPinchEnded,
     pointer: null,
     pinchPoint: null,
     pinchRatio: null,
+    drawingPinchRatio: null,
   };
+}
+
+class PinchTracker {
+  private isActive = false;
+  private enterFrames = 0;
+  private exitFrames = 0;
+
+  public update(ratio: number): {
+    isPinching: boolean;
+    started: boolean;
+    ended: boolean;
+  } {
+    const wasActive = this.isActive;
+
+    if (this.isActive) {
+      this.enterFrames = 0;
+
+      if (ratio >= pinchExitRatio) {
+        this.exitFrames += 1;
+        if (this.exitFrames >= pinchExitConfirmFrames) {
+          this.isActive = false;
+          this.exitFrames = 0;
+        }
+      } else {
+        this.exitFrames = 0;
+      }
+    } else {
+      this.exitFrames = 0;
+
+      if (ratio < pinchEnterRatio) {
+        this.enterFrames += 1;
+        if (this.enterFrames >= pinchEnterConfirmFrames) {
+          this.isActive = true;
+          this.enterFrames = 0;
+        }
+      } else {
+        this.enterFrames = 0;
+      }
+    }
+
+    return {
+      isPinching: this.isActive,
+      started: !wasActive && this.isActive,
+      ended: wasActive && !this.isActive,
+    };
+  }
+
+  public handleMissingObservation(): void {
+    this.enterFrames = 0;
+    this.exitFrames = 0;
+  }
+
+  public reset(): void {
+    this.isActive = false;
+    this.enterFrames = 0;
+    this.exitFrames = 0;
+  }
 }
 
 function isFingerExtended(
@@ -131,6 +178,14 @@ function distance(
 ): number {
   if (!first || !second) return 0;
   return Math.hypot(first.x - second.x, first.y - second.y);
+}
+
+function getRelativeDistance(
+  first: NormalizedLandmark | undefined,
+  second: NormalizedLandmark | undefined,
+  palmWidth: number,
+): number {
+  return palmWidth > 0 ? distance(first, second) / palmWidth : 1;
 }
 
 function midpoint(
